@@ -107,14 +107,14 @@ const FEATURED = [
     desc:"Newer (2010s) resort-style gated community, huge clubhouse, diverse young-family heavy." },
 ];
 
-// Non-subdivision civic landmarks (points)
+// Non-subdivision civic landmarks (points). `star:true` = emphasized anchor.
 const LANDMARKS = [
-  { name:"Newtown Park", lat:34.0500, lng:-84.1560,
-    desc:"City's signature park: amphitheater, dog park, veterans memorial, community events." },
+  { name:"Medley (the \"Avalon\" of Johns Creek)", lat:34.0618, lng:-84.1656, star:true,
+    desc:"Johns Creek's answer to Alpharetta's Avalon: a 43-acre walkable mixed-use district on the former State Farm campus (11650 Johns Creek Pkwy at McGinnis Ferry). 150k sf retail/dining/entertainment, a 175-key boutique hotel, lifestyle office, ~750 apartments + 133 townhomes, and a 25k-sf plaza. Grand opening slated Oct 29, 2026." },
+  { name:"City Hall & The Boardwalk at Town Center", lat:34.0605, lng:-84.1691, star:true,
+    desc:"City Hall (11360 Lakefield Dr) anchors the 192-acre Town Center masterplan. Beside it, the $39M Boardwalk at Town Center (opened May 2026): elevated wetland trail, amphitheater/bandshell, pond overlooks, plus a pedestrian tunnel under Medlock Bridge Rd linking to west-side retail." },
   { name:"Autrey Mill Nature Preserve", lat:34.0355, lng:-84.2075,
     desc:"46-acre preserve with a historic village and trails — heritage anchor for the city." },
-  { name:"Town Center / Medlock Crossing", lat:34.0360, lng:-84.1560,
-    desc:"Retail & dining heart along Medlock Bridge / Peachtree Pkwy — the de facto downtown." },
 ];
 
 const map = L.map('map', { scrollWheelZoom:true }).setView([34.030, -84.190], 13);
@@ -167,8 +167,13 @@ fetch('jc_subdivisions.geojson').then(r=>r.json()).then(gj => {
 
 // Landmarks
 LANDMARKS.forEach(l => {
-  L.marker([l.lat,l.lng]).addTo(map)
-   .bindPopup(`<b>${l.name}</b><br>${l.desc}`);
+  if (l.star){
+    L.circleMarker([l.lat,l.lng], { radius:9, fillColor:"#ff7b6b", color:"#fff", weight:2.5, fillOpacity:1 })
+     .addTo(map).bindPopup(`<b>${l.name}</b><br>${l.desc}`);
+    L.marker([l.lat,l.lng], { icon:L.divIcon({ className:'hood-label', html:'★ '+l.name.split(' (')[0], iconSize:[0,0] }), interactive:false }).addTo(map);
+  } else {
+    L.marker([l.lat,l.lng]).addTo(map).bindPopup(`<b>${l.name}</b><br>${l.desc}`);
+  }
 });
 
 // Legend
