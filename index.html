@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Johns Creek Neighborhoods &amp; Areas</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body { margin:0; padding:0; height:100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  #wrap { display:flex; height:100vh; }
+  #map { flex:1; }
+  #side {
+    width:340px; overflow-y:auto; background:#0f1720; color:#e7edf3;
+    padding:18px 20px; box-sizing:border-box; border-right:1px solid #223;
+  }
+  #side h1 { font-size:19px; margin:0 0 4px; }
+  #side .sub { font-size:12px; color:#8fa3b5; margin:0 0 16px; }
+  .legend-item { display:flex; align-items:flex-start; gap:9px; margin:11px 0; cursor:pointer; }
+  .legend-item:hover .name { text-decoration:underline; }
+  .dot { width:14px; height:14px; border-radius:50%; margin-top:3px; flex-shrink:0; border:2px solid rgba(255,255,255,.7); }
+  .name { font-size:13.5px; font-weight:600; }
+  .desc { font-size:11.5px; color:#9db0c1; line-height:1.35; margin-top:1px; }
+  .cat-head { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:#6d8296; margin:20px 0 4px; border-top:1px solid #223; padding-top:12px; }
+  .foot { font-size:10.5px; color:#5f7488; margin-top:22px; line-height:1.4; }
+  .leaflet-popup-content { font-size:13px; line-height:1.4; }
+  .leaflet-popup-content b { font-size:14px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="side">
+    <h1>Johns Creek</h1>
+    <p class="sub">Culturally &amp; socially notable neighborhoods. Click a pin or a name to fly there.</p>
+    <div id="legend"></div>
+    <p class="foot">Map data © OpenStreetMap contributors. Neighborhood pins are approximate centroids for orientation, not legal boundaries. Character notes are general local reputation, not gospel.</p>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Category colors
+const CATS = {
+  prestige: { label:"Prestige / gated golf", color:"#e0b04a" },
+  golf:     { label:"Golf & swim/tennis clubs", color:"#4aa3df" },
+  swimtennis:{ label:"Established swim/tennis subdivisions", color:"#5fbf7f" },
+  newer:    { label:"Newer / luxury enclaves", color:"#c77dff" },
+  landmark: { label:"Civic & landmarks", color:"#ff7b6b" },
+};
+
+// Neighborhoods — approximate lat/lng centroids in Johns Creek, GA
+const HOODS = [
+  { name:"Country Club of the South", cat:"prestige", lat:34.0086, lng:-84.2258,
+    desc:"The blue-chip address. Guard-gated, Jack Nicklaus signature golf course, big-money estates. Where CEOs and athletes have lived." },
+  { name:"St Ives Country Club", cat:"prestige", lat:34.0225, lng:-84.1720,
+    desc:"Guard-gated golf & country club community off Medlock Bridge. Tom Fazio course, strong community identity, very established." },
+  { name:"Sugar Mill", cat:"swimtennis", lat:34.0335, lng:-84.1600,
+    desc:"Large, well-loved swim/tennis neighborhood. Family-heavy, active HOA, one of the recognizable 'you're from Sugar Mill' communities." },
+  { name:"Parsons Run", cat:"swimtennis", lat:34.0410, lng:-84.1735,
+    desc:"Established swim/tennis subdivision, mature trees, tight-knit. A classic old-Johns-Creek family neighborhood." },
+  { name:"Rivermont", cat:"golf", lat:34.0000, lng:-84.2470,
+    desc:"Older prestige golf community along the Chattahoochee (technically Johns Creek/Alpharetta edge). River access, Rivermont Golf & Country Club." },
+  { name:"Medlock Bridge", cat:"golf", lat:34.0180, lng:-84.1850,
+    desc:"Namesake of the main corridor. Golf & country club community; the road it sits on is Johns Creek's central spine." },
+  { name:"Seven Oaks", cat:"swimtennis", lat:34.0470, lng:-84.1620,
+    desc:"Big swim/tennis community with award-winning amenities, strong HOA, lots of neighborhood events." },
+  { name:"The Falls of Autry Mill", cat:"prestige", lat:34.0300, lng:-84.2130,
+    desc:"Upscale gated swim/tennis community with a waterfall/creek feel, larger custom homes." },
+  { name:"Chartwell", cat:"swimtennis", lat:34.0355, lng:-84.1990,
+    desc:"Established, leafy swim/tennis neighborhood off Old Alabama, well regarded for schools and stability." },
+  { name:"Doublegate", cat:"swimtennis", lat:34.0400, lng:-84.2080,
+    desc:"Long-standing family swim/tennis community, one of the older recognizable subdivisions in the area." },
+  { name:"Bellmoore Park", cat:"newer", lat:34.0555, lng:-84.1490,
+    desc:"Newer (2010s) resort-style gated community near Newtown, huge clubhouse, diverse and young-family heavy." },
+  { name:"Standard Club", cat:"golf", lat:34.0510, lng:-84.2160,
+    desc:"Historic private country club community (roots in Atlanta's Jewish community), golf and social club." },
+  { name:"Barrington Farms", cat:"swimtennis", lat:34.0290, lng:-84.1520,
+    desc:"Comfortable swim/tennis subdivision, family friendly, close to the Medlock/Peachtree Pkwy retail." },
+  { name:"Wellington Lake / Abbotts Bridge area", cat:"swimtennis", lat:34.0620, lng:-84.1700,
+    desc:"Cluster of established neighborhoods near Abbotts Bridge Rd, lake amenities and easy 141 access." },
+  { name:"Johns Creek Town Center / Medlock Crossing", cat:"landmark", lat:34.0360, lng:-84.1560,
+    desc:"Retail & dining heart along Medlock Bridge / Peachtree Pkwy — the de facto 'downtown' gathering area." },
+  { name:"Newtown Park", cat:"landmark", lat:34.0500, lng:-84.1560,
+    desc:"City's signature park: amphitheater, dog park, veterans memorial, farmers-market and community events hub." },
+  { name:"Autrey Mill Nature Preserve", cat:"landmark", lat:34.0355, lng:-84.2075,
+    desc:"46-acre preserve with historic village and trails — a cultural/heritage anchor for the city." },
+];
+
+const map = L.map('map', { scrollWheelZoom:true }).setView([34.030, -84.190], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+const markers = {};
+HOODS.forEach((h, i) => {
+  const c = CATS[h.cat].color;
+  const m = L.circleMarker([h.lat, h.lng], {
+    radius: h.cat === 'landmark' ? 7 : 9,
+    fillColor: c, color:"#fff", weight:2, opacity:1, fillOpacity:0.9
+  }).addTo(map);
+  m.bindPopup(`<b>${h.name}</b><br><span style="color:#555;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">${CATS[h.cat].label}</span><br>${h.desc}`);
+  m.bindTooltip(h.name, { permanent:false, direction:'top' });
+  markers[i] = m;
+});
+
+// Build legend grouped by category
+const legend = document.getElementById('legend');
+Object.keys(CATS).forEach(catKey => {
+  const head = document.createElement('div');
+  head.className = 'cat-head';
+  head.innerHTML = `<span style="color:${CATS[catKey].color}">●</span> ${CATS[catKey].label}`;
+  legend.appendChild(head);
+  HOODS.forEach((h, i) => {
+    if (h.cat !== catKey) return;
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<div class="dot" style="background:${CATS[catKey].color}"></div>
+      <div><div class="name">${h.name}</div><div class="desc">${h.desc}</div></div>`;
+    item.onclick = () => { map.flyTo([h.lat, h.lng], 15, {duration:0.8}); markers[i].openPopup(); };
+    legend.appendChild(item);
+  });
+});
+</script>
+</body>
+</html>
