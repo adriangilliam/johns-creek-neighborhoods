@@ -8,10 +8,22 @@
 <style>
   html, body { margin:0; padding:0; height:100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   #wrap { display:flex; height:100vh; }
-  #map { flex:1; }
+  #map { flex:1; min-height:0; }
   #side {
     width:340px; overflow-y:auto; background:#0f1720; color:#e7edf3;
     padding:18px 20px; box-sizing:border-box; border-right:1px solid #223;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  /* Mobile: stack map on top, scrollable list below */
+  @media (max-width: 760px) {
+    #wrap { flex-direction:column; height:100vh; height:100dvh; }
+    #map { flex:0 0 55vh; height:55vh; width:100%; border-bottom:2px solid #223; }
+    #side { width:100%; flex:1 1 auto; border-right:none; padding:16px 18px 40px; }
+    #side h1 { font-size:22px; }
+    .legend-item { margin:14px 0; }
+    .name { font-size:15px; }
+    .desc { font-size:13px; }
   }
   #side h1 { font-size:19px; margin:0 0 4px; }
   #side .sub { font-size:12px; color:#8fa3b5; margin:0 0 16px; }
@@ -117,10 +129,20 @@ Object.keys(CATS).forEach(catKey => {
     item.className = 'legend-item';
     item.innerHTML = `<div class="dot" style="background:${CATS[catKey].color}"></div>
       <div><div class="name">${h.name}</div><div class="desc">${h.desc}</div></div>`;
-    item.onclick = () => { map.flyTo([h.lat, h.lng], 15, {duration:0.8}); markers[i].openPopup(); };
+    item.onclick = () => {
+      if (window.matchMedia("(max-width: 760px)").matches) {
+        document.getElementById('map').scrollIntoView({behavior:'smooth', block:'start'});
+      }
+      map.flyTo([h.lat, h.lng], 15, {duration:0.8});
+      markers[i].openPopup();
+    };
     legend.appendChild(item);
   });
 });
+
+// Keep Leaflet sized correctly across responsive layout changes / rotation
+window.addEventListener('resize', () => map.invalidateSize());
+setTimeout(() => map.invalidateSize(), 200);
 </script>
 </body>
 </html>
