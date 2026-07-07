@@ -8,139 +8,208 @@
 <style>
   html, body { margin:0; padding:0; height:100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   #wrap { display:flex; height:100vh; }
-  #map { flex:1; min-height:0; }
+  #map { flex:1; min-height:0; background:#e9eef2; }
   #side {
     width:340px; overflow-y:auto; background:#0f1720; color:#e7edf3;
     padding:18px 20px; box-sizing:border-box; border-right:1px solid #223;
     -webkit-overflow-scrolling:touch;
   }
-
-  /* Mobile: stack map on top, scrollable list below */
+  #side h1 { font-size:19px; margin:0 0 4px; }
+  #side .sub { font-size:12px; color:#8fa3b5; margin:0 0 14px; }
+  .legend-item { display:flex; align-items:flex-start; gap:9px; margin:10px 0; cursor:pointer; }
+  .legend-item:hover .name { text-decoration:underline; }
+  .dot { width:14px; height:14px; border-radius:3px; margin-top:3px; flex-shrink:0; border:1.5px solid rgba(255,255,255,.7); }
+  .name { font-size:13.5px; font-weight:600; }
+  .desc { font-size:11.5px; color:#9db0c1; line-height:1.35; margin-top:1px; }
+  .cat-head { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:#6d8296; margin:18px 0 4px; border-top:1px solid #223; padding-top:11px; }
+  .foot { font-size:10.5px; color:#5f7488; margin-top:20px; line-height:1.4; }
+  .leaflet-popup-content { font-size:13px; line-height:1.4; }
+  .hood-label {
+    background:transparent; border:none; box-shadow:none;
+    font-size:11px; font-weight:700; color:#1b2b3a;
+    text-shadow:0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+    white-space:nowrap; pointer-events:none;
+  }
   @media (max-width: 760px) {
     #wrap { flex-direction:column; height:100vh; height:100dvh; }
     #map { flex:0 0 55vh; height:55vh; width:100%; border-bottom:2px solid #223; }
     #side { width:100%; flex:1 1 auto; border-right:none; padding:16px 18px 40px; }
     #side h1 { font-size:22px; }
-    .legend-item { margin:14px 0; }
     .name { font-size:15px; }
     .desc { font-size:13px; }
   }
-  #side h1 { font-size:19px; margin:0 0 4px; }
-  #side .sub { font-size:12px; color:#8fa3b5; margin:0 0 16px; }
-  .legend-item { display:flex; align-items:flex-start; gap:9px; margin:11px 0; cursor:pointer; }
-  .legend-item:hover .name { text-decoration:underline; }
-  .dot { width:14px; height:14px; border-radius:50%; margin-top:3px; flex-shrink:0; border:2px solid rgba(255,255,255,.7); }
-  .name { font-size:13.5px; font-weight:600; }
-  .desc { font-size:11.5px; color:#9db0c1; line-height:1.35; margin-top:1px; }
-  .cat-head { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:#6d8296; margin:20px 0 4px; border-top:1px solid #223; padding-top:12px; }
-  .foot { font-size:10.5px; color:#5f7488; margin-top:22px; line-height:1.4; }
-  .leaflet-popup-content { font-size:13px; line-height:1.4; }
-  .leaflet-popup-content b { font-size:14px; }
 </style>
 </head>
 <body>
 <div id="wrap">
   <div id="side">
     <h1>Johns Creek</h1>
-    <p class="sub">Culturally &amp; socially notable neighborhoods. Click a pin or a name to fly there.</p>
+    <p class="sub">Real subdivision boundaries (Fulton County GIS). Marquee neighborhoods are shaded &amp; labeled; every other platted subdivision is drawn faintly for context. Tap a name to zoom.</p>
     <div id="legend"></div>
-    <p class="foot">Map data © OpenStreetMap contributors. Neighborhood pins are approximate centroids for orientation, not legal boundaries. Character notes are general local reputation, not gospel.</p>
+    <p class="foot">Boundaries © Fulton County GIS "Subdivisions" layer (authoritative plat data). Basemap © CARTO &amp; OpenStreetMap contributors. Marquee grouping &amp; character notes are local reputation, not official designations.</p>
   </div>
   <div id="map"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// Category colors
 const CATS = {
-  prestige: { label:"Prestige / gated golf", color:"#e0b04a" },
-  golf:     { label:"Golf & swim/tennis clubs", color:"#4aa3df" },
-  swimtennis:{ label:"Established swim/tennis subdivisions", color:"#5fbf7f" },
-  newer:    { label:"Newer / luxury enclaves", color:"#c77dff" },
-  landmark: { label:"Civic & landmarks", color:"#ff7b6b" },
+  prestige:  { label:"Prestige / gated golf", color:"#d4a017" },
+  golf:      { label:"Golf & country club", color:"#2f8fd6" },
+  swimtennis:{ label:"Established swim/tennis", color:"#43a86b" },
+  newer:     { label:"Newer luxury enclave", color:"#a259d6" },
 };
 
-// Neighborhoods — approximate lat/lng centroids in Johns Creek, GA
-const HOODS = [
-  { name:"Country Club of the South", cat:"prestige", lat:34.0086, lng:-84.2258,
-    desc:"The blue-chip address. Guard-gated, Jack Nicklaus signature golf course, big-money estates. Where CEOs and athletes have lived." },
-  { name:"St Ives Country Club", cat:"prestige", lat:34.0225, lng:-84.1720,
-    desc:"Guard-gated golf & country club community off Medlock Bridge. Tom Fazio course, strong community identity, very established." },
-  { name:"Sugar Mill", cat:"swimtennis", lat:34.0335, lng:-84.1600,
-    desc:"Large, well-loved swim/tennis neighborhood. Family-heavy, active HOA, one of the recognizable 'you're from Sugar Mill' communities." },
-  { name:"Parsons Run", cat:"swimtennis", lat:34.0410, lng:-84.1735,
-    desc:"Established swim/tennis subdivision, mature trees, tight-knit. A classic old-Johns-Creek family neighborhood." },
-  { name:"Rivermont", cat:"golf", lat:34.0000, lng:-84.2470,
-    desc:"Older prestige golf community along the Chattahoochee (technically Johns Creek/Alpharetta edge). River access, Rivermont Golf & Country Club." },
-  { name:"Medlock Bridge", cat:"golf", lat:34.0180, lng:-84.1850,
-    desc:"Namesake of the main corridor. Golf & country club community; the road it sits on is Johns Creek's central spine." },
-  { name:"Seven Oaks", cat:"swimtennis", lat:34.0470, lng:-84.1620,
-    desc:"Big swim/tennis community with award-winning amenities, strong HOA, lots of neighborhood events." },
-  { name:"The Falls of Autry Mill", cat:"prestige", lat:34.0300, lng:-84.2130,
-    desc:"Upscale gated swim/tennis community with a waterfall/creek feel, larger custom homes." },
-  { name:"Chartwell", cat:"swimtennis", lat:34.0355, lng:-84.1990,
-    desc:"Established, leafy swim/tennis neighborhood off Old Alabama, well regarded for schools and stability." },
-  { name:"Doublegate", cat:"swimtennis", lat:34.0400, lng:-84.2080,
-    desc:"Long-standing family swim/tennis community, one of the older recognizable subdivisions in the area." },
-  { name:"Bellmoore Park", cat:"newer", lat:34.0555, lng:-84.1490,
-    desc:"Newer (2010s) resort-style gated community near Newtown, huge clubhouse, diverse and young-family heavy." },
-  { name:"Standard Club", cat:"golf", lat:34.0510, lng:-84.2160,
-    desc:"Historic private country club community (roots in Atlanta's Jewish community), golf and social club." },
-  { name:"Barrington Farms", cat:"swimtennis", lat:34.0290, lng:-84.1520,
-    desc:"Comfortable swim/tennis subdivision, family friendly, close to the Medlock/Peachtree Pkwy retail." },
-  { name:"Wellington Lake / Abbotts Bridge area", cat:"swimtennis", lat:34.0620, lng:-84.1700,
-    desc:"Cluster of established neighborhoods near Abbotts Bridge Rd, lake amenities and easy 141 access." },
-  { name:"Johns Creek Town Center / Medlock Crossing", cat:"landmark", lat:34.0360, lng:-84.1560,
-    desc:"Retail & dining heart along Medlock Bridge / Peachtree Pkwy — the de facto 'downtown' gathering area." },
-  { name:"Newtown Park", cat:"landmark", lat:34.0500, lng:-84.1560,
-    desc:"City's signature park: amphitheater, dog park, veterans memorial, farmers-market and community events hub." },
-  { name:"Autrey Mill Nature Preserve", cat:"landmark", lat:34.0355, lng:-84.2075,
-    desc:"46-acre preserve with historic village and trails — a cultural/heritage anchor for the city." },
+// Featured neighborhoods: match county SubdivName by lowercase substring(s).
+// Order matters — first match wins. Pods/phases collapse into one group.
+const FEATURED = [
+  { id:"ccs",       name:"Country Club of the South", cat:"prestige",
+    match:["country club of the south"],
+    desc:"The blue-chip address. Guard-gated, Jack Nicklaus signature golf, big-money estates." },
+  { id:"stives",    name:"St Ives Country Club", cat:"prestige",
+    match:["st. ives","st ives"],
+    desc:"Guard-gated Tom Fazio golf community. Strong identity, one of the original prestige enclaves." },
+  { id:"autrymill", name:"Falls of Autry Mill", cat:"prestige",
+    match:["falls of autry mill"],
+    desc:"Upscale gated swim/tennis community with a creek/waterfall feel and large custom homes." },
+  { id:"rivermont", name:"Rivermont", cat:"golf",
+    match:["rivermont"],
+    desc:"Older prestige golf community along the Chattahoochee. River access, Rivermont Golf & CC." },
+  { id:"medlock",   name:"Medlock Bridge", cat:"golf",
+    match:["medlock bridge"],
+    desc:"Golf & country club community; namesake of Johns Creek's central corridor." },
+  { id:"sugarmill", name:"Sugar Mill", cat:"swimtennis",
+    match:["sugar mill"],
+    desc:"Large, well-loved swim/tennis neighborhood. Family-heavy, active HOA, a recognizable identity." },
+  { id:"parsons",   name:"Parsons Run", cat:"swimtennis",
+    match:["parsons run"],
+    desc:"Established swim/tennis subdivision, mature trees, classic old-Johns-Creek family enclave." },
+  { id:"sevenoaks", name:"Seven Oaks", cat:"swimtennis",
+    match:["seven oaks"],
+    desc:"Big swim/tennis community, award-winning amenities, lots of neighborhood events." },
+  { id:"chartwell", name:"Chartwell", cat:"swimtennis",
+    match:["chartwell"],
+    desc:"Leafy, established swim/tennis neighborhood off Old Alabama, well regarded for schools." },
+  { id:"doublegate",name:"Doublegate", cat:"swimtennis",
+    match:["doublegate"],
+    desc:"Long-standing family swim/tennis community, one of the older recognizable subdivisions." },
+  { id:"wellington",name:"Wellington", cat:"swimtennis",
+    match:["wellington"],
+    desc:"Sprawling multi-pod swim/tennis community (Estates, Reserve, Regency, Enclave at Wellington)." },
+  { id:"thornhill", name:"Thornhill", cat:"swimtennis",
+    match:["thornhill"],
+    desc:"Popular swim/tennis neighborhood with a strong community feel off State Bridge." },
+  { id:"cameron",   name:"Cameron Forest / Crest", cat:"swimtennis",
+    match:["cameron forest","cameron parc","cameron woods","cameron crest"],
+    desc:"Cluster of established Cameron swim/tennis neighborhoods, family staples." },
+  { id:"bellmoore", name:"Bellmoore Park", cat:"newer",
+    match:["bellmoore","palisades at bellmoore"],
+    desc:"Newer (2010s) resort-style gated community, huge clubhouse, diverse young-family heavy." },
+];
+
+// Non-subdivision civic landmarks (points)
+const LANDMARKS = [
+  { name:"Newtown Park", lat:34.0500, lng:-84.1560,
+    desc:"City's signature park: amphitheater, dog park, veterans memorial, community events." },
+  { name:"Autrey Mill Nature Preserve", lat:34.0355, lng:-84.2075,
+    desc:"46-acre preserve with a historic village and trails — heritage anchor for the city." },
+  { name:"Town Center / Medlock Crossing", lat:34.0360, lng:-84.1560,
+    desc:"Retail & dining heart along Medlock Bridge / Peachtree Pkwy — the de facto downtown." },
 ];
 
 const map = L.map('map', { scrollWheelZoom:true }).setView([34.030, -84.190], 13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; OpenStreetMap contributors'
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  maxZoom: 20, subdomains:'abcd',
+  attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
 }).addTo(map);
 
-const markers = {};
-HOODS.forEach((h, i) => {
-  const c = CATS[h.cat].color;
-  const m = L.circleMarker([h.lat, h.lng], {
-    radius: h.cat === 'landmark' ? 7 : 9,
-    fillColor: c, color:"#fff", weight:2, opacity:1, fillOpacity:0.9
+function defFor(name){
+  const n = (name||"").toLowerCase();
+  for (const f of FEATURED){ if (f.match.some(m => n.includes(m))) return f; }
+  return null;
+}
+
+const groups = {}; // id -> {def, layer(featureGroup)}
+FEATURED.forEach(f => groups[f.id] = { def:f, layer:L.featureGroup() });
+
+fetch('jc_subdivisions.geojson').then(r=>r.json()).then(gj => {
+  L.geoJSON(gj, {
+    style: feat => {
+      const d = defFor(feat.properties.SubdivName);
+      if (d) return { color:CATS[d.cat].color, weight:1.4, fillColor:CATS[d.cat].color, fillOpacity:0.42, opacity:0.95 };
+      return { color:"#7c8b99", weight:0.7, fillColor:"#9aa8b5", fillOpacity:0.12, opacity:0.5 };
+    },
+    onEachFeature: (feat, lyr) => {
+      const nm = feat.properties.SubdivName || "Unnamed";
+      const d = defFor(nm);
+      if (d){
+        lyr.bindPopup(`<b>${d.name}</b><br><span style="color:#666;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">${CATS[d.cat].label}</span><br>${d.desc}<br><span style="color:#999;font-size:11px;">plat: ${nm}</span>`);
+        groups[d.id].layer.addLayer(lyr);
+      } else {
+        lyr.bindPopup(`<b>${nm}</b><br><span style="color:#999;font-size:11px;">Platted subdivision (Fulton County)</span>`);
+      }
+    }
   }).addTo(map);
-  m.bindPopup(`<b>${h.name}</b><br><span style="color:#555;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">${CATS[h.cat].label}</span><br>${h.desc}`);
-  m.bindTooltip(h.name, { permanent:false, direction:'top' });
-  markers[i] = m;
+
+  // Add permanent labels at each featured group's center
+  Object.values(groups).forEach(g => {
+    if (!g.layer.getLayers().length) return;
+    g.layer.addTo(map);
+    const c = g.layer.getBounds().getCenter();
+    L.marker(c, { icon:L.divIcon({ className:'hood-label', html:g.def.name, iconSize:[0,0] }), interactive:false }).addTo(map);
+  });
+}).catch(e => {
+  const w = document.createElement('div');
+  w.style.cssText='position:absolute;top:10px;left:10px;z-index:9999;background:#fff;padding:8px 12px;border-radius:6px;font-size:12px;';
+  w.textContent='Could not load boundary data (jc_subdivisions.geojson).';
+  document.getElementById('map').appendChild(w);
 });
 
-// Build legend grouped by category
+// Landmarks
+LANDMARKS.forEach(l => {
+  L.marker([l.lat,l.lng]).addTo(map)
+   .bindPopup(`<b>${l.name}</b><br>${l.desc}`);
+});
+
+// Legend
 const legend = document.getElementById('legend');
 Object.keys(CATS).forEach(catKey => {
   const head = document.createElement('div');
-  head.className = 'cat-head';
-  head.innerHTML = `<span style="color:${CATS[catKey].color}">●</span> ${CATS[catKey].label}`;
+  head.className='cat-head';
+  head.innerHTML = `<span style="color:${CATS[catKey].color}">■</span> ${CATS[catKey].label}`;
   legend.appendChild(head);
-  HOODS.forEach((h, i) => {
-    if (h.cat !== catKey) return;
+  FEATURED.filter(f=>f.cat===catKey).forEach(f => {
     const item = document.createElement('div');
-    item.className = 'legend-item';
+    item.className='legend-item';
     item.innerHTML = `<div class="dot" style="background:${CATS[catKey].color}"></div>
-      <div><div class="name">${h.name}</div><div class="desc">${h.desc}</div></div>`;
+      <div><div class="name">${f.name}</div><div class="desc">${f.desc}</div></div>`;
     item.onclick = () => {
-      if (window.matchMedia("(max-width: 760px)").matches) {
+      const g = groups[f.id];
+      if (window.matchMedia("(max-width: 760px)").matches)
         document.getElementById('map').scrollIntoView({behavior:'smooth', block:'start'});
+      if (g && g.layer.getLayers().length){
+        map.flyToBounds(g.layer.getBounds().pad(0.4), {duration:0.8});
+        g.layer.getLayers()[0].openPopup();
       }
-      map.flyTo([h.lat, h.lng], 15, {duration:0.8});
-      markers[i].openPopup();
     };
     legend.appendChild(item);
   });
 });
+// Civic landmarks in legend
+const lh = document.createElement('div'); lh.className='cat-head';
+lh.innerHTML = '<span style="color:#ff7b6b">●</span> Civic & landmarks'; legend.appendChild(lh);
+LANDMARKS.forEach(l => {
+  const item = document.createElement('div'); item.className='legend-item';
+  item.innerHTML = `<div class="dot" style="background:#ff7b6b;border-radius:50%"></div>
+    <div><div class="name">${l.name}</div><div class="desc">${l.desc}</div></div>`;
+  item.onclick = () => {
+    if (window.matchMedia("(max-width: 760px)").matches)
+      document.getElementById('map').scrollIntoView({behavior:'smooth', block:'start'});
+    map.flyTo([l.lat,l.lng], 15, {duration:0.8});
+  };
+  legend.appendChild(item);
+});
 
-// Keep Leaflet sized correctly across responsive layout changes / rotation
 window.addEventListener('resize', () => map.invalidateSize());
 setTimeout(() => map.invalidateSize(), 200);
 </script>
