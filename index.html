@@ -117,6 +117,31 @@ const LANDMARKS = [
     desc:"46-acre preserve with a historic village and trails — heritage anchor for the city." },
 ];
 
+// Schools (points only, no attendance zones). tier: ES / MS / HS / Private
+const SCHOOL_TIERS = {
+  ES:      { label:"Elementary", color:"#ef6c00", letter:"E" },
+  MS:      { label:"Middle",     color:"#6a1b9a", letter:"M" },
+  HS:      { label:"High",       color:"#00695c", letter:"H" },
+  Private: { label:"Private",    color:"#37474f", letter:"P" },
+};
+const SCHOOLS = [
+  { n:"Dolvin Elementary",        t:"ES", lat:34.0362, lng:-84.2328 },
+  { n:"Findley Oaks Elementary",  t:"ES", lat:34.0607, lng:-84.1867 },
+  { n:"Medlock Bridge Elementary",t:"ES", lat:34.0295, lng:-84.1906 },
+  { n:"Ocee Elementary",          t:"ES", lat:34.0526, lng:-84.2313 },
+  { n:"Shakerag Elementary",      t:"ES", lat:34.0455, lng:-84.1290 },
+  { n:"Abbotts Hill Elementary",  t:"ES", lat:34.0565, lng:-84.1967 },
+  { n:"Barnwell Elementary",      t:"ES", lat:34.0000, lng:-84.2751 },
+  { n:"Wilson Creek Elementary",  t:"ES", lat:34.0346, lng:-84.1818 },
+  { n:"Autrey Mill Middle",       t:"MS", lat:34.0184, lng:-84.2395 },
+  { n:"River Trail Middle",       t:"MS", lat:34.0433, lng:-84.1238 },
+  { n:"Taylor Road Middle",       t:"MS", lat:34.0531, lng:-84.2084 },
+  { n:"Johns Creek High",         t:"HS", lat:34.0226, lng:-84.1930 },
+  { n:"Northview High",           t:"HS", lat:34.0391, lng:-84.1776 },
+  { n:"Chattahoochee High",       t:"HS", lat:34.0498, lng:-84.2085 },
+  { n:"Mount Pisgah Christian",   t:"Private", lat:34.0187, lng:-84.2795 },
+];
+
 const map = L.map('map', { scrollWheelZoom:true }).setView([34.030, -84.190], 13);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
   maxZoom: 20, subdomains:'abcd',
@@ -176,6 +201,21 @@ LANDMARKS.forEach(l => {
   }
 });
 
+// Schools
+const schoolMarkers = {};
+SCHOOLS.forEach((s,i) => {
+  const t = SCHOOL_TIERS[s.t];
+  const icon = L.divIcon({
+    className:'school-badge',
+    html:`<div style="width:16px;height:16px;border-radius:50%;background:${t.color};color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:16px;border:1.5px solid #fff;box-shadow:0 0 2px rgba(0,0,0,.55)">${t.letter}</div>`,
+    iconSize:[16,16], iconAnchor:[8,8]
+  });
+  const m = L.marker([s.lat,s.lng], { icon }).addTo(map)
+    .bindTooltip(s.n, { direction:'top' })
+    .bindPopup(`<b>${s.n}</b><br><span style="color:#666;font-size:11px;">${t.label} school</span>`);
+  schoolMarkers[i] = m;
+});
+
 // Legend
 const legend = document.getElementById('legend');
 Object.keys(CATS).forEach(catKey => {
@@ -211,6 +251,30 @@ LANDMARKS.forEach(l => {
     if (window.matchMedia("(max-width: 760px)").matches)
       document.getElementById('map').scrollIntoView({behavior:'smooth', block:'start'});
     map.flyTo([l.lat,l.lng], 15, {duration:0.8});
+  };
+  legend.appendChild(item);
+});
+
+// Schools legend
+const sh = document.createElement('div'); sh.className='cat-head';
+sh.innerHTML = '🎓 Schools <span style="text-transform:none;letter-spacing:0;color:#5f7488;">(points only, no zones)</span>';
+legend.appendChild(sh);
+const tierRow = document.createElement('div');
+tierRow.style.cssText='display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 8px;font-size:11px;color:#9db0c1;';
+Object.values(SCHOOL_TIERS).forEach(t => {
+  tierRow.innerHTML += `<span><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${t.color};color:#fff;font-size:9px;font-weight:700;text-align:center;line-height:14px;vertical-align:middle;">${t.letter}</span> ${t.label}</span>`;
+});
+legend.appendChild(tierRow);
+SCHOOLS.forEach((s,i) => {
+  const item = document.createElement('div'); item.className='legend-item'; item.style.margin='6px 0';
+  const t = SCHOOL_TIERS[s.t];
+  item.innerHTML = `<div class="dot" style="background:${t.color};border-radius:50%;width:12px;height:12px;"></div>
+    <div><div class="name" style="font-weight:500;font-size:12.5px;">${s.n}</div></div>`;
+  item.onclick = () => {
+    if (window.matchMedia("(max-width: 760px)").matches)
+      document.getElementById('map').scrollIntoView({behavior:'smooth', block:'start'});
+    map.flyTo([s.lat,s.lng], 16, {duration:0.8});
+    schoolMarkers[i].openPopup();
   };
   legend.appendChild(item);
 });
